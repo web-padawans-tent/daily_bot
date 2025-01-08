@@ -1,15 +1,17 @@
-import hashlib
-from flask import Flask, render_template_string, request, jsonify
-import requests
-import time
 import json
-from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN, SECRET_KEY, BOT_TOKEN, db
+import os
+import time
 from datetime import datetime, timedelta
-from functions import generate_merchant_signature, extract_user_id_from_reference, add_user_to_channel, generate_signature, delete_user_from_channel
+
+
+from flask import Flask, render_template_string, request, jsonify
+
+from functions import generate_merchant_signature, extract_user_id_from_reference, add_user_to_channel, \
+    generate_signature, delete_user_from_channel
+from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN, db
 
 
 app = Flask(__name__)
-
 
 @app.route('/')
 def index():
@@ -80,7 +82,7 @@ transition: background-color 0.3s ease;
 <div class="container">
 <a href="https://t.me/sveta_kosovska" class="btn btn-telegram">Telegram</a>
 <a href="https://www.instagram.com/sveta_kosovska" class="btn btn-instagram">Instagram</a>
-<a href="https://t.me/+D6AUy8eFDxQ1YTQy" class="btn lookbook__btn lookbook__btn_red">Festive Lookbook</a>       
+<a href="https://t.me/newyearlookbook_bot" class="btn lookbook__btn lookbook__btn_red">New Year Lookbook 2025</a>       
 <a href="https://t.me/+i8D-g8m5_Ak2MDNi" class="btn lookbook__btn lookbook__btn_white">LookBook</a>
 <a href="https://ssk24test.my.canva.site/daglhozlvg0" class="btn btn-other">Ціни на послуги</a>
 <a href="https://t.me/kosovskamanager" class="btn btn-support">Підтримка</a>
@@ -91,7 +93,6 @@ transition: background-color 0.3s ease;
 
     """
     return render_template_string(html_template)
-
 
 @app.route('/payment_callback', methods=['POST'])
 def callback():
@@ -110,6 +111,7 @@ def callback():
             add_user_to_channel(user_id)
             db.add_subs(user_id, paymentSys)
         else:
+            add_user_to_channel(user_id)
             db.update_subs(user_id)
         response = {
             "orderReference": order_reference,
@@ -156,7 +158,6 @@ def callback():
 
     else:
         return jsonify({"response": "Payment failed!"}), 400
-    print(data)
     return "200"
 
 

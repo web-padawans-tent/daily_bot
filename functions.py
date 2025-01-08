@@ -1,7 +1,12 @@
+import threading
+import time
+
 from loader import SECRET_KEY, BOT_TOKEN, CHANNEL_ID, ADMIN_ID, db
 import hmac
 import hashlib
 import requests
+from datetime import datetime, timedelta
+import calendar
 
 
 def generate_merchant_signature(merchant_account, merchant_domain, order_reference, order_date, amount, currency, product_name, product_price, product_count):
@@ -21,25 +26,33 @@ def extract_user_id_from_reference(order_reference):
     return order_reference.split("_")[1]
 
 
+def generate_short_link_name(user_id):
+    unique_string = f"user_{user_id}_{int(time.time())}"
+    short_name = hashlib.md5(unique_string.encode()).hexdigest()[:32]
+    return short_name
+
 def add_user_to_channel(user_id):
     dbuser = db.get_user(user_id)
 
+    # URL для створення посилання
     invite_link_url = f"https://api.telegram.org/bot{BOT_TOKEN}/createChatInviteLink"
 
+    # Параметри посилання
     invite_link_params = {
         "chat_id": CHANNEL_ID,
-        "name": "Одноразове посилання",
-        "expiration_date": 0,
-        "member_limit": 1,
+        "name": generate_short_link_name(user_id),
+        "member_limit": 1,  # Обмеження: лише один користувач
         "creates_join_request": False
     }
 
+    # Відправлення запиту на створення посилання
     response = requests.post(invite_link_url, json=invite_link_params)
 
     if response.status_code == 200:
         invite_link = response.json().get('result', {}).get('invite_link')
 
         if invite_link:
+            # Відправлення посилання користувачу
             message = (
                 "Дякуємо за оплату! Ваша місячна підписка на канал LookBook активована.\n\n"
                 f"[Перейти до каналу]({invite_link})"
@@ -55,7 +68,8 @@ def add_user_to_channel(user_id):
             )
 
             if user_response.status_code == 200:
-                admin_message = f"✅ Пользователь @{dbuser[0]} - {dbuser[1]} успешно добавлен в канал."
+                # Повідомлення адміністратору
+                admin_message = f"Користувач @{dbuser[0]} - {dbuser[1]} успішно доданий до каналу."
                 requests.get(
                     f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
                     params={
@@ -64,27 +78,10 @@ def add_user_to_channel(user_id):
                     }
                 )
             else:
-                admin_message = (
-                    f"❗ Не удалось отправить сообщение пользователю @{dbuser[0]} - {dbuser[1]}. "
-                    f"Возможно, пользователь удален или не начал чат с ботом."
-                )
-                requests.get(
-                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                    params={
-                        "chat_id": ADMIN_ID,
-                        "text": admin_message
-                    }
-                )
-        else:
-            admin_message = "❗ Ошибка при получении ссылки для пользователя."
-            requests.get(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                params={
-                    "chat_id": ADMIN_ID,
-                    "text": admin_message
-                }
-            )
+                # Помилка надсилання повідомлення користувачу
+                print(f"Помилка надсилання повідомлення: {user_response.json()}")
     else:
+        # Помилка створення посилання
         error_message = f"Помилка створення запрошення: {response.json()}"
         requests.get(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
@@ -93,7 +90,6 @@ def add_user_to_channel(user_id):
                 "text": error_message
             }
         )
-
 
 def delete_user_from_channel(user_id):
     dbuser = db.get_user(user_id)
@@ -112,7 +108,6 @@ def delete_user_from_channel(user_id):
         }
         unban_response = requests.post(unban_url, params=unban_params)
         print("Користувача видалено з каналу.")
-        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage?chat_id={ADMIN_ID}&text=Користувачa @{dbuser[0]} - {dbuser[1]} видалено каналу!")
     else:
         print("Помилка при видаленні користувача:", ban_response.json())
 
