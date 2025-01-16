@@ -108,6 +108,8 @@ def delete_user_from_channel(user_id):
         }
         unban_response = requests.post(unban_url, params=unban_params)
         print("Користувача видалено з каналу.")
+        requests.get(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage?chat_id={ADMIN_ID}&text=Користувачa @{dbuser[0]} - {dbuser[1]} видалено каналу!")
     else:
         print("Помилка при видаленні користувача:", ban_response.json())
 

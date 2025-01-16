@@ -13,6 +13,12 @@ from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN, db
 
 app = Flask(__name__)
 
+@app.route('/delete')
+def delete():
+    delete_user_from_channel(805194233)
+    return "200"
+
+
 @app.route('/')
 def index():
     html_template = """
@@ -97,68 +103,65 @@ transition: background-color 0.3s ease;
 @app.route('/payment_callback', methods=['POST'])
 def callback():
     data_str = request.form.to_dict()
-    data_json_str = list(data_str.keys())[0]  # Отримуємо перший ключ
-    data = json.loads(data_json_str)
-    order_reference = data['orderReference']
-    processing_time = int(time.time()) 
+
+    # Проверка входных данных
+    if not data_str:
+        return jsonify({"error": "No data received"}), 400
+
+    try:
+        data_json_str = list(data_str.keys())[0]
+        data = json.loads(data_json_str)
+    except (IndexError, json.JSONDecodeError):
+        return jsonify({"error": "Invalid JSON data"}), 400
+
+    # Основные данные
+    order_reference = data.get('orderReference')
+    if not order_reference:
+        return jsonify({"error": "Missing order reference"}), 400
+
+    processing_time = int(time.time())
     status = 'accept'
     user_id = extract_user_id_from_reference(order_reference)
     signature = generate_signature(order_reference, status, processing_time)
 
-    if data.get("transactionStatus") == "Approved":
-        paymentSys = data['paymentSystem']
+    def generate_response():
+        return {
+            "orderReference": order_reference,
+            "status": status,
+            "time": processing_time,
+            "signature": signature
+        }
+
+    # Обработка статусов
+    transaction_status = data.get("transactionStatus")
+    if transaction_status == "Approved":
+        payment_sys = data.get('paymentSystem')
         if not db.get_subs(user_id):
             add_user_to_channel(user_id)
-            db.add_subs(user_id, paymentSys)
+            db.add_subs(user_id, payment_sys)
         else:
             add_user_to_channel(user_id)
             db.update_subs(user_id)
-        response = {
-            "orderReference": order_reference,
-            "status": status,
-            "time": processing_time,
-            "signature": signature        
-            }
-        return jsonify(response), 200
-
-    elif data.get("transactionStatus") == "Declined":
-        if not db.get_subs(user_id):
-            print('User doen not Exist')
-        else:
-            delete_user_from_channel(user_id)
-        response = {
-            "orderReference": f"{order_reference}",
-            "status": status,
-            "time": processing_time,
-            "signature": signature        
-            }
-        return jsonify(response), 200
-
-    elif data.get("transactionStatus") == "Expired":
         print(data)
-        user_id = extract_user_id_from_reference(order_reference)
-        response = {
-            "orderReference": order_reference,
-            "status": status,
-            "time": processing_time,
-            "signature": signature        
-            }
-        return jsonify(response)
+        return jsonify(generate_response()), 200
 
-    if data.get("transactionStatus") == "Refunded":
+    elif transaction_status == "Declined":
+        delete_user_from_channel(user_id)
         print(data)
-        user_id = extract_user_id_from_reference(order_reference)
-        response = {
-            "orderReference": order_reference,
-            "status": status,
-            "time": processing_time,
-            "signature": signature        
-            }
-        return jsonify(response)
+        return jsonify(generate_response()), 200
 
-    else:
-        return jsonify({"response": "Payment failed!"}), 400
-    return "200"
+    elif transaction_status == "Expired":
+        delete_user_from_channel(user_id)
+        print(data)
+        return jsonify(generate_response()), 200
+
+    elif transaction_status == "Refunded":
+        delete_user_from_channel(user_id)
+        print(data)
+        return jsonify(generate_response()), 200
+
+    # Если статус не распознан
+    return jsonify({"response": "Payment failed!"}), 400
 
 
 @app.route('/pay/<int:user_id>')
