@@ -13,12 +13,6 @@ from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN, db
 
 app = Flask(__name__)
 
-@app.route('/delete')
-def delete():
-    delete_user_from_channel(805194233)
-    return "200"
-
-
 @app.route('/')
 def index():
     html_template = """

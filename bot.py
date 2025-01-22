@@ -65,6 +65,17 @@ async def handle_start(message: types.Message):
     # Отправка сообщения с кнопкой
     await bot.send_message(chat_id=user_id, text=text, parse_mode="HTML", reply_markup=keyboard)
 
+@router.message(Command(commands=["support"]))
+async def support_command_handler(message: types.Message):
+    # Варіант 1: Відправка текстового посилання
+    support_link = "https://t.me/@kosovskamanager"  # Замініть на ваше реальне посилання
+
+    # Варіант 2: Кнопка з посиланням
+    inline_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Зв'язатися з техпідтримкою", url=support_link)]
+    ])
+    await message.answer("Натисніть на кнопку нижче, щоб зв'язатися з техпідтримкою:", reply_markup=inline_kb)
+
 async def main():
     await dp.start_polling(bot)
 
