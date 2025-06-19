@@ -4,3 +4,4 @@ asyncio
 aiohttp
 requests
 python-dotenv
+dateutil

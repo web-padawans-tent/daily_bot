@@ -1,13 +1,10 @@
-import threading
 import time
 
 from loader import SECRET_KEY, BOT_TOKEN, CHANNEL_ID, ADMIN_ID, db
+from aiogram import Bot
 import hmac
 import hashlib
 import requests
-from datetime import datetime, timedelta
-import calendar
-
 
 def generate_merchant_signature(merchant_account, merchant_domain, order_reference, order_date, amount, currency, product_name, product_price, product_count):
     signature_string = f"{merchant_account};{merchant_domain};{order_reference};{order_date};{amount};{currency};"
@@ -31,8 +28,17 @@ def generate_short_link_name(user_id):
     short_name = hashlib.md5(unique_string.encode()).hexdigest()[:32]
     return short_name
 
-def add_user_to_channel(user_id):
+async def add_user_to_channel(user_id, payment_sys):
+    if not db.get_subs(user_id):
+        db.add_subs(user_id, payment_sys)
+    else:
+        db.update_subs(user_id, payment_sys)
+
     dbuser = db.get_user(user_id)
+
+    bot = Bot(token=BOT_TOKEN)
+
+    await bot.unban_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
 
     # URL для створення посилання
     invite_link_url = f"https://api.telegram.org/bot{BOT_TOKEN}/createChatInviteLink"
@@ -93,7 +99,7 @@ def add_user_to_channel(user_id):
 
 def delete_user_from_channel(user_id):
     dbuser = db.get_user(user_id)
-    ban_url = f'https://api.telegram.org/bot{BOT_TOKEN}/banChatMember'
+    ban_url = f'https://api.telegram.org/bot{BOT_TOKEN}/kickChatMember'
     ban_params = {
         'chat_id': CHANNEL_ID,
         'user_id': user_id
@@ -101,15 +107,8 @@ def delete_user_from_channel(user_id):
     ban_response = requests.post(ban_url, params=ban_params)
 
     if ban_response.status_code == 200:
-        unban_url = f'https://api.telegram.org/bot{BOT_TOKEN}/unbanChatMember'
-        unban_params = {
-            'chat_id': CHANNEL_ID,
-            'user_id': user_id
-        }
-        unban_response = requests.post(unban_url, params=unban_params)
         print("Користувача видалено з каналу.")
         requests.get(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage?chat_id={ADMIN_ID}&text=Користувачa @{dbuser[0]} - {dbuser[1]} видалено каналу!")
     else:
         print("Помилка при видаленні користувача:", ban_response.json())
-

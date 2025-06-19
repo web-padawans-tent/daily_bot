@@ -1,5 +1,4 @@
 import json
-import os
 import time
 from datetime import datetime, timedelta
 
@@ -13,6 +12,14 @@ from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN, db
 
 app = Flask(__name__)
 
+@app.route('/add_user')
+async def add_user():
+    await add_user_to_channel(7559268811, 'Test')
+    return "200"
+@app.route('/delete')
+def delete():
+    delete_user_from_channel(7559268811)
+    return "200"
 @app.route('/')
 def index():
     html_template = """
@@ -81,8 +88,7 @@ transition: background-color 0.3s ease;
 
 <div class="container">
 <a href="https://t.me/sveta_kosovska" class="btn btn-telegram">Telegram</a>
-<a href="https://www.instagram.com/sveta_kosovska" class="btn btn-instagram">Instagram</a>
-<a href="https://t.me/newyearlookbook_bot" class="btn lookbook__btn lookbook__btn_red">New Year Lookbook 2025</a>       
+<a href="https://www.instagram.com/sveta_kosovska" class="btn btn-instagram">Instagram</a>       
 <a href="https://t.me/+i8D-g8m5_Ak2MDNi" class="btn lookbook__btn lookbook__btn_white">LookBook</a>
 <a href="https://ssk24test.my.canva.site/daglhozlvg0" class="btn btn-other">Ціни на послуги</a>
 <a href="https://t.me/kosovskamanager" class="btn btn-support">Підтримка</a>
@@ -93,6 +99,7 @@ transition: background-color 0.3s ease;
 
     """
     return render_template_string(html_template)
+
 
 @app.route('/payment_callback', methods=['POST'])
 def callback():
@@ -128,34 +135,16 @@ def callback():
 
     # Обработка статусов
     transaction_status = data.get("transactionStatus")
+    payment_sys = data.get("paymentSystem")
+
     if transaction_status == "Approved":
-        payment_sys = data.get('paymentSystem')
-        if not db.get_subs(user_id):
-            add_user_to_channel(user_id)
-            db.add_subs(user_id, payment_sys)
-        else:
-            add_user_to_channel(user_id)
-            db.update_subs(user_id)
-        print(data)
-        return jsonify(generate_response()), 200
+        add_user_to_channel(user_id, payment_sys)
 
-    elif transaction_status == "Declined":
+    elif transaction_status in {"Declined", "Expired", "Refunded"}:
         delete_user_from_channel(user_id)
-        print(data)
-        return jsonify(generate_response()), 200
 
-    elif transaction_status == "Expired":
-        delete_user_from_channel(user_id)
-        print(data)
-        return jsonify(generate_response()), 200
-
-    elif transaction_status == "Refunded":
-        delete_user_from_channel(user_id)
-        print(data)
-        return jsonify(generate_response()), 200
-
-    # Если статус не распознан
-    return jsonify({"response": "Payment failed!"}), 400
+    print(data)
+    return jsonify(generate_response()), 200
 
 
 @app.route('/pay/<int:user_id>')
@@ -165,7 +154,7 @@ def pay(user_id):
     product_name = ["Subscription to Telegram Channel"]
     product_price = [599]
     product_count = [1]
-    order_date = int(time.time()) 
+    order_date = int(time.time())
     today = datetime.now()
     future_date = today + timedelta(days=30)
     date_next = future_date.strftime("%d.%m.20%y")

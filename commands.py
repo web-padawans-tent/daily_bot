@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 class Database:
     def __init__(self, db):
@@ -15,7 +16,12 @@ class Database:
         self.conn.commit()
 
     def add_subs(self, userid, payMethod):
-        self.cur.execute("INSERT INTO subs (subsuser, pay_method) VALUES (?, ?)", (userid, payMethod))
+        now = datetime.now().replace(microsecond=0)
+        next_month = now + relativedelta(months=1)
+        self.cur.execute(
+            "INSERT INTO subs (subsuser, pay_method, start_sub, next_sub) VALUES (?, ?, ?, ?)",
+            (userid, payMethod, now, next_month)
+        )
         self.conn.commit()
 
     def get_user(self, userid):
@@ -25,6 +31,16 @@ class Database:
         self.cur.execute("SELECT * FROM subs WHERE subsuser = ?", (userid,))
         return bool(self.cur.fetchone())
        
-    def update_subs(self, userid):
-        self.cur.execute("UPDATE subs SET start_sub = ? WHERE subsuser = ?", (datetime.now(), userid))
+    def update_subs(self, userid, payMethod):
+        now = datetime.now().replace(microsecond=0)
+        next_month = now + relativedelta(months=1)
+        self.cur.execute(
+            "UPDATE subs SET pay_method = ?, start_sub = ?, next_sub = ?, tried_pay = ? WHERE subsuser = ?",
+            (payMethod, now, next_month, now, userid)
+        )
+        self.conn.commit()
+
+    def payment_attempt(self, user_id):
+        now = datetime.now().replace(microsecond=0)
+        self.cur.execute("UPDATE subs SET tried_pay = ? WHERE subsuser = ?", (now, user_id))
         self.conn.commit()
