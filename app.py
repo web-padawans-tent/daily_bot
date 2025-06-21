@@ -1,25 +1,26 @@
 import json
 import time
 from datetime import datetime, timedelta
-
-
 from flask import Flask, render_template_string, request, jsonify
-
 from functions import generate_merchant_signature, extract_user_id_from_reference, add_user_to_channel, \
     generate_signature, delete_user_from_channel
-from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN, db
-
+from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN
 
 app = Flask(__name__)
+
 
 @app.route('/add_user')
 async def add_user():
     await add_user_to_channel(7559268811, 'Test')
     return "200"
+
+
 @app.route('/delete')
-def delete():
-    delete_user_from_channel(7559268811)
+async def delete():
+    await delete_user_from_channel(7559268811)
     return "200"
+
+
 @app.route('/')
 def index():
     html_template = """
@@ -105,7 +106,6 @@ transition: background-color 0.3s ease;
 def callback():
     data_str = request.form.to_dict()
 
-    # Проверка входных данных
     if not data_str:
         return jsonify({"error": "No data received"}), 400
 

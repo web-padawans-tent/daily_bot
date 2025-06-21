@@ -1,9 +1,5 @@
-import hashlib
-import time
-import logging
-from aiogram import Bot, Dispatcher, Router, F, types
-from aiogram.types import LabeledPrice, PreCheckoutQuery, Message, ContentType, ChatJoinRequest, InlineKeyboardButton, \
-    InlineKeyboardMarkup
+from aiogram import Bot, Dispatcher, Router, types
+from aiogram.types import ChatJoinRequest, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from loader import BOT_TOKEN, MERCHANT_DOMAIN, db
 
