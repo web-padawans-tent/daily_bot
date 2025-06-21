@@ -136,12 +136,12 @@ def callback():
 
     if transaction_status == "Approved":
         logger.info(f"Платёж подтверждён. Добавляем пользователя {user_id}")
-        add_user_to_channel(user_id, payment_sys)
+        add_user_to_channel(user_id, payment_sys, order_reference)
 
     elif transaction_status in {"Declined", "Expired", "Refunded"}:
         logger.info(
             f"Платёж отклонён ({transaction_status}). Удаляем пользователя {user_id}")
-        delete_user_from_channel(user_id)
+        delete_user_from_channel(user_id, order_reference)
 
     else:
         logger.warning(f"Неизвестный статус: {transaction_status}")

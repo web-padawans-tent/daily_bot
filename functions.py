@@ -32,16 +32,18 @@ def generate_short_link_name(user_id):
     return short_name
 
 
-async def add_user_to_channel(user_id, payment_sys):
+async def add_user_to_channel(user_id, payment_sys, order_reference):
     logger.info(
-        f"Запуск додавання користувача {user_id} з оплатою через {payment_sys}")
+        f"Запуск додавання користувача {user_id} з оплатою через {payment_sys} та референсом {order_reference}")
 
     if not db.get_subs(user_id):
-        db.add_subs(user_id, payment_sys)
-        logger.info(f"Нова підписка створена для користувача {user_id}")
+        db.add_subs(user_id, payment_sys, order_reference)
+        logger.info(
+            f"Нова підписка створена для користувача {user_id} з референсом {order_reference}")
     else:
-        db.update_subs(user_id, payment_sys)
-        logger.info(f"Підписка оновлена для користувача {user_id}")
+        db.update_subs(user_id, payment_sys, order_reference)
+        logger.info(
+            f"Підписка оновлена для користувача {user_id} з референсом {order_reference}")
 
     dbuser = db.get_user(user_id)
 
@@ -102,7 +104,12 @@ async def delete_user_from_channel(user_id):
     logger.info(f"Запуск видалення користувача {user_id} з каналу")
 
     dbuser = db.get_user(user_id)
+    current_sub = db.get_subs(user_id)
     bot = Bot(token=BOT_TOKEN)
+
+    if not current_sub:
+        logger.info(f"[Удаление] Подписка не найдена для user_id={user_id}")
+        return
 
     ban_url = f'https://api.telegram.org/bot{BOT_TOKEN}/kickChatMember'
     ban_params = {
