@@ -1,5 +1,5 @@
 import time
-from logger import logger
+from logger import app_logger as logger
 from loader import SECRET_KEY, BOT_TOKEN, CHANNEL_ID, ADMIN_ID, db
 from aiogram import Bot
 import hmac

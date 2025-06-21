@@ -5,18 +5,23 @@ from flask import Flask, render_template_string, request, jsonify
 from functions import generate_merchant_signature, extract_user_id_from_reference, add_user_to_channel, \
     generate_signature, delete_user_from_channel
 from loader import MERCHANT_ACCOUNT, MERCHANT_DOMAIN
+from logger import flask_logger as logger
 
 app = Flask(__name__)
+
+logger.info("Приложение запущено")
 
 
 @app.route('/add_user')
 async def add_user():
+    logger.info("Ручной запуск добавления пользователя 7559268811")
     await add_user_to_channel(7559268811, 'Test')
     return "200"
 
 
 @app.route('/delete')
 async def delete():
+    logger.info("Ручной запуск удаления пользователя 7559268811")
     await delete_user_from_channel(7559268811)
     return "200"
 
@@ -107,48 +112,52 @@ def callback():
     data_str = request.form.to_dict()
 
     if not data_str:
+        logger.warning("Callback получен без данных")
         return jsonify({"error": "No data received"}), 400
 
     try:
         data_json_str = list(data_str.keys())[0]
         data = json.loads(data_json_str)
     except (IndexError, json.JSONDecodeError):
+        logger.error("Ошибка при парсинге JSON от Wayforpay")
         return jsonify({"error": "Invalid JSON data"}), 400
 
-    # Основные данные
     order_reference = data.get('orderReference')
     if not order_reference:
+        logger.error("Callback без orderReference")
         return jsonify({"error": "Missing order reference"}), 400
 
-    processing_time = int(time.time())
-    status = 'accept'
     user_id = extract_user_id_from_reference(order_reference)
-    signature = generate_signature(order_reference, status, processing_time)
-
-    def generate_response():
-        return {
-            "orderReference": order_reference,
-            "status": status,
-            "time": processing_time,
-            "signature": signature
-        }
-
-    # Обработка статусов
     transaction_status = data.get("transactionStatus")
     payment_sys = data.get("paymentSystem")
 
+    logger.info(
+        f"Wayforpay callback: user_id={user_id}, status={transaction_status}, reference={order_reference}")
+
     if transaction_status == "Approved":
+        logger.info(f"Платёж подтверждён. Добавляем пользователя {user_id}")
         add_user_to_channel(user_id, payment_sys)
 
     elif transaction_status in {"Declined", "Expired", "Refunded"}:
+        logger.info(
+            f"Платёж отклонён ({transaction_status}). Удаляем пользователя {user_id}")
         delete_user_from_channel(user_id)
 
-    print(data)
-    return jsonify(generate_response()), 200
+    else:
+        logger.warning(f"Неизвестный статус: {transaction_status}")
+
+    return jsonify({
+        "orderReference": order_reference,
+        "status": "accept",
+        "time": int(time.time()),
+        "signature": generate_signature(order_reference, "accept", int(time.time()))
+    }), 200
 
 
 @app.route('/pay/<int:user_id>')
 def pay(user_id):
+    logger.info(f"Переход на страницу оплаты пользователем {user_id}")
+
     amount = 599
     currency = "UAH"
     product_name = ["Subscription to Telegram Channel"]
