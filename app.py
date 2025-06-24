@@ -15,14 +15,14 @@ logger.info("Приложение запущено")
 @app.route('/add_user')
 async def add_user():
     logger.info("Ручной запуск добавления пользователя 7559268811")
-    await add_user_to_channel(7559268811, 'Test')
+    await add_user_to_channel(7559268811, 'Test', 'invoice_6121734473_1750631791')
     return "200"
 
 
 @app.route('/delete')
 async def delete():
     logger.info("Ручной запуск удаления пользователя 7559268811")
-    await delete_user_from_channel(7559268811)
+    await delete_user_from_channel(502712347, "test")
     return "200"
 
 
@@ -108,7 +108,7 @@ transition: background-color 0.3s ease;
 
 
 @app.route('/payment_callback', methods=['POST'])
-def callback():
+async def callback():
     data_str = request.form.to_dict()
 
     if not data_str:
@@ -136,12 +136,12 @@ def callback():
 
     if transaction_status == "Approved":
         logger.info(f"Платёж подтверждён. Добавляем пользователя {user_id}")
-        add_user_to_channel(user_id, payment_sys, order_reference)
+        await add_user_to_channel(user_id, payment_sys, order_reference)
 
     elif transaction_status in {"Declined", "Expired", "Refunded"}:
         logger.info(
             f"Платёж отклонён ({transaction_status}). Удаляем пользователя {user_id}")
-        delete_user_from_channel(user_id, order_reference)
+        await delete_user_from_channel(user_id, order_reference)
 
     else:
         logger.warning(f"Неизвестный статус: {transaction_status}")

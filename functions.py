@@ -100,8 +100,10 @@ async def add_user_to_channel(user_id, payment_sys, order_reference):
                     f"Помилка надсилання повідомлення користувачу {user_id}: {error_text}")
 
 
-async def delete_user_from_channel(user_id):
+async def delete_user_from_channel(user_id, order_reference):
     logger.info(f"Запуск видалення користувача {user_id} з каналу")
+
+    db.payment_attempt(user_id)
 
     dbuser = db.get_user(user_id)
     current_sub = db.get_subs(user_id)
