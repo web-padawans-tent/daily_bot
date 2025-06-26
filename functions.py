@@ -1,10 +1,27 @@
 import time
 from logger import app_logger as logger
-from loader import SECRET_KEY, BOT_TOKEN, CHANNEL_ID, ADMIN_ID, db
+from loader import SECRET_KEY, BOT_TOKEN, CHANNEL_ID, ADMIN_ID, MERCHANT_ACCOUNT, MERCHANT_PASSWORD, db
 from aiogram import Bot
 import hmac
 import hashlib
 import aiohttp
+
+
+async def suspend_regular(order_reference: str) -> dict:
+    payload = {
+        "requestType": "SUSPEND",
+        "merchantAccount": MERCHANT_ACCOUNT,
+        "merchantPassword": MERCHANT_PASSWORD,
+        "orderReference": order_reference
+    }
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post("https://api.wayforpay.com/regularApi", json=payload) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+        except aiohttp.ClientError as e:
+            return {"error": str(e), "orderReference": order_reference}
 
 
 def generate_merchant_signature(merchant_account, merchant_domain, order_reference, order_date, amount, currency, product_name, product_price, product_count):
@@ -102,6 +119,14 @@ async def add_user_to_channel(user_id, payment_sys, order_reference):
 
 async def delete_user_from_channel(user_id, order_reference):
     logger.info(f"Запуск видалення користувача {user_id} з каналу")
+
+    suspend_result = await suspend_regular(order_reference)
+    if "reason" in suspend_result:
+        logger.info(
+            f"Регулярку {order_reference} призупинено: {suspend_result['reason']}")
+    else:
+        logger.warning(
+            f"Не вдалося призупинити регулярку {order_reference}: {suspend_result}")
 
     db.payment_attempt(user_id)
 

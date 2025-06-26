@@ -12,18 +12,18 @@ app = Flask(__name__)
 logger.info("Приложение запущено")
 
 
-@app.route('/add_user')
-async def add_user():
-    logger.info("Ручной запуск добавления пользователя 7559268811")
-    await add_user_to_channel(7559268811, 'Test', 'invoice_6121734473_1750631791')
-    return "200"
+# @app.route('/add_user')
+# async def add_user():
+#    logger.info("Ручной запуск добавления пользователя 325351359")
+#    await add_user_to_channel(311279160, 'applePay', 'invoice_311279160_1750680346')
+#    return "200"
 
 
-@app.route('/delete')
-async def delete():
-    logger.info("Ручной запуск удаления пользователя 7559268811")
-    await delete_user_from_channel(502712347, "test")
-    return "200"
+# @app.route('/delete')
+# async def delete():
+#    logger.info("Ручной запуск удаления пользователя 7559268811")
+#    await delete_user_from_channel(502712347, "test")
+#    return "200"
 
 
 @app.route('/')
@@ -138,7 +138,7 @@ async def callback():
         logger.info(f"Платёж подтверждён. Добавляем пользователя {user_id}")
         await add_user_to_channel(user_id, payment_sys, order_reference)
 
-    elif transaction_status in {"Declined", "Expired", "Refunded"}:
+    elif transaction_status in {"None", "Declined", "Expired", "Refunded"}:
         logger.info(
             f"Платёж отклонён ({transaction_status}). Удаляем пользователя {user_id}")
         await delete_user_from_channel(user_id, order_reference)
@@ -158,10 +158,10 @@ async def callback():
 def pay(user_id):
     logger.info(f"Переход на страницу оплаты пользователем {user_id}")
 
-    amount = 599
+    amount = 1500
     currency = "UAH"
     product_name = ["Subscription to Telegram Channel"]
-    product_price = [599]
+    product_price = [1500]
     product_count = [1]
     order_date = int(time.time())
     today = datetime.now()
