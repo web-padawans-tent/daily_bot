@@ -17,12 +17,13 @@ class Database:
             "INSERT INTO users (userid, username, fullname) VALUES (?, ?, ?)", (user_id, username, fullname))
         self.conn.commit()
 
-    def add_subs(self, userid, payMethod, order_reference):
+    def add_subs(self, userid, payMethod, orderReference, userName=None, lastStatus=None):
         now = datetime.now().replace(microsecond=0)
         next_month = now + relativedelta(months=1)
         self.cur.execute(
-            "INSERT INTO subs (subsuser, pay_method, start_sub, next_sub, order_reference) VALUES (?, ?, ?, ?, ?)",
-            (userid, payMethod, now, next_month, order_reference)
+            "INSERT INTO subs (subsuser, pay_method, start_sub, next_sub, order_reference, telegram_username, last_payment_status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (userid, payMethod, now, next_month,
+             orderReference, userName, lastStatus)
         )
         self.conn.commit()
 
@@ -33,12 +34,13 @@ class Database:
         self.cur.execute("SELECT * FROM subs WHERE subsuser = ?", (userid,))
         return bool(self.cur.fetchone())
 
-    def update_subs(self, userid, payMethod, order_reference):
+    def update_subs(self, userid, payMethod, orderReference, userName=None, lastStatus=None):
         now = datetime.now().replace(microsecond=0)
         next_month = now + relativedelta(months=1)
         self.cur.execute(
-            "UPDATE subs SET pay_method = ?, start_sub = ?, next_sub = ?, tried_pay = ?, order_reference = ? WHERE subsuser = ?",
-            (payMethod, now, next_month, now, order_reference, userid)
+            "UPDATE subs SET pay_method = ?, start_sub = ?, next_sub = ?, tried_pay = ?, order_reference = ?, telegram_username = ?, last_payment_status = ? WHERE subsuser = ?",
+            (payMethod, now, next_month, now,
+             orderReference, userName, lastStatus, userid)
         )
         self.conn.commit()
 

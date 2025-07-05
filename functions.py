@@ -7,7 +7,44 @@ import hashlib
 import aiohttp
 
 
+async def get_telegram_info(user_id: int) -> dict:
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember"
+    params = {
+        "chat_id": CHANNEL_ID,
+        "user_id": user_id
+    }
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, params=params) as resp:
+                data = await resp.json()
+                if data.get("ok") and "user" in data["result"]:
+                    user = data["result"]["user"]
+                    return {
+                        "first_name": user.get("first_name", ""),
+                        "last_name": user.get("last_name", ""),
+                        "username": user.get("username", ""),
+                        "tg_status": data["result"].get("status", ""),
+                    }
+        except aiohttp.ClientError as e:
+            logger.error(f"[Telegram] Помилка aiohttp для {user_id}: {e}")
+        except Exception as e:
+            logger.error(f"[Telegram] Інша помилка для {user_id}: {e}")
+
+    return {
+        "first_name": "",
+        "last_name": "",
+        "username": "",
+        "tg_status": "unknown"
+    }
+
+
 async def suspend_regular(order_reference: str) -> dict:
+    if order_reference.startswith("invoice_"):
+        parts = order_reference.split("_")
+        if len(parts) >= 3:
+            order_reference = "_".join(parts[:3])
+
     payload = {
         "requestType": "SUSPEND",
         "merchantAccount": MERCHANT_ACCOUNT,
@@ -49,16 +86,20 @@ def generate_short_link_name(user_id):
     return short_name
 
 
-async def add_user_to_channel(user_id, payment_sys, order_reference):
+async def add_user_to_channel(user_id, payment_sys, order_reference, status=None):
     logger.info(
         f"Запуск додавання користувача {user_id} з оплатою через {payment_sys} та референсом {order_reference}")
 
+    tg_info = await get_telegram_info(user_id)
+
     if not db.get_subs(user_id):
-        db.add_subs(user_id, payment_sys, order_reference)
+        db.add_subs(user_id, payment_sys, order_reference,
+                    tg_info["username"], status)
         logger.info(
             f"Нова підписка створена для користувача {user_id} з референсом {order_reference}")
     else:
-        db.update_subs(user_id, payment_sys, order_reference)
+        db.update_subs(user_id, payment_sys, order_reference,
+                       tg_info["username"], status)
         logger.info(
             f"Підписка оновлена для користувача {user_id} з референсом {order_reference}")
 
@@ -117,13 +158,19 @@ async def add_user_to_channel(user_id, payment_sys, order_reference):
                     f"Помилка надсилання повідомлення користувачу {user_id}: {error_text}")
 
 
-async def delete_user_from_channel(user_id, order_reference):
+async def delete_user_from_channel(user_id, payment_sys, order_reference, status=None):
     logger.info(f"Запуск видалення користувача {user_id} з каналу")
+
+    tg_info = await get_telegram_info(user_id)
 
     suspend_result = await suspend_regular(order_reference)
     if "reason" in suspend_result:
         logger.info(
             f"Регулярку {order_reference} призупинено: {suspend_result['reason']}")
+        db.update_subs(user_id, payment_sys, order_reference,
+                       tg_info["username"], status)
+        logger.info(
+            f"Підписка оновлена для користувача {user_id} з референсом {order_reference}")
     else:
         logger.warning(
             f"Не вдалося призупинити регулярку {order_reference}: {suspend_result}")
@@ -131,12 +178,8 @@ async def delete_user_from_channel(user_id, order_reference):
     db.payment_attempt(user_id)
 
     dbuser = db.get_user(user_id)
-    current_sub = db.get_subs(user_id)
-    bot = Bot(token=BOT_TOKEN)
 
-    if not current_sub:
-        logger.info(f"[Удаление] Подписка не найдена для user_id={user_id}")
-        return
+    bot = Bot(token=BOT_TOKEN)
 
     ban_url = f'https://api.telegram.org/bot{BOT_TOKEN}/kickChatMember'
     ban_params = {

@@ -136,12 +136,12 @@ async def callback():
 
     if transaction_status == "Approved":
         logger.info(f"Платёж подтверждён. Добавляем пользователя {user_id}")
-        await add_user_to_channel(user_id, payment_sys, order_reference)
+        await add_user_to_channel(user_id, payment_sys, order_reference, transaction_status)
 
     elif transaction_status in {"None", "Declined", "Expired", "Refunded"}:
         logger.info(
             f"Платёж отклонён ({transaction_status}). Удаляем пользователя {user_id}")
-        await delete_user_from_channel(user_id, order_reference)
+        await delete_user_from_channel(user_id, payment_sys, order_reference, transaction_status)
 
     else:
         logger.warning(f"Неизвестный статус: {transaction_status}")
@@ -162,6 +162,67 @@ def pay(user_id):
     currency = "UAH"
     product_name = ["Subscription to Telegram Channel"]
     product_price = [1500]
+    product_count = [1]
+    order_date = int(time.time())
+    today = datetime.now()
+    future_date = today + timedelta(days=30)
+    date_next = future_date.strftime("%d.%m.20%y")
+    order_reference = f"invoice_{user_id}_{order_date}"
+
+    # Генеруємо підпис
+    signature = generate_merchant_signature(
+        MERCHANT_ACCOUNT,
+        MERCHANT_DOMAIN,
+        order_reference,
+        order_date,
+        amount,
+        currency,
+        product_name,
+        product_price,
+        product_count
+    )
+
+    html_content = f"""
+    <html>
+      <body>
+        <form id="wayforpay_form" action="https://secure.wayforpay.com/pay" method="POST">
+            <input type="hidden" name="merchantAccount" value="{MERCHANT_ACCOUNT}">
+            <input type="hidden" name="merchantDomainName" value="{MERCHANT_DOMAIN}">
+            <input type="hidden" name="serviceUrl" value="{MERCHANT_DOMAIN}/payment_callback">
+            <input type="hidden" name="orderReference" value="{order_reference}">
+            <input type="hidden" name="orderDate" value="{order_date}">
+            <input type="hidden" name="amount" value="{amount}">
+            <input type="hidden" name="currency" value="UAH">
+            <input type="hidden" name="productName[]" value="{product_name[0]}">
+            <input type="hidden" name="productPrice[]" value="{amount}">
+            <input type="hidden" name="productCount[]" value="1">
+            <input type="hidden" name="regularOn" value="1">
+            <input type="hidden" name="regularBehavior" value="preset">
+            <input type="hidden" name="regularAmount" value="{amount}">
+            <input type="hidden" name="regularMode" value="monthly">
+            <input type="hidden" name="regularCount" value="24">
+            <input type="hidden" name="dateNext" value="{date_next}">
+            <input type="hidden" name="merchantSignature" value="{signature}">
+            <input type="submit" value="Оплатити">
+        </form>
+
+        <script type="text/javascript">
+            document.getElementById('wayforpay_form').submit();
+        </script>
+      </body>
+    </html>
+    """
+    return render_template_string(html_content)
+
+
+@app.route('/pay-vera/<int:user_id>')
+def payVera(user_id):
+    logger.info(f"Переход на страницу оплаты пользователем {user_id}")
+
+    amount = 599
+    currency = "UAH"
+    product_name = ["Subscription to Telegram Channel"]
+    product_price = [599]
     product_count = [1]
     order_date = int(time.time())
     today = datetime.now()

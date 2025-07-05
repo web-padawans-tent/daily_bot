@@ -202,7 +202,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-database.db
+*.db
 
 *.csv
 analyse/session_name.session
+update_subs.py
+test.py
