@@ -97,65 +97,65 @@ async def add_user_to_channel(user_id, payment_sys, order_reference, status=None
                     tg_info["username"], status)
         logger.info(
             f"Нова підписка створена для користувача {user_id} з референсом {order_reference}")
+
+        dbuser = db.get_user(user_id)
+
+        invite_link_url = f"https://api.telegram.org/bot{BOT_TOKEN}/createChatInviteLink"
+        invite_link_params = {
+            "chat_id": CHANNEL_ID,
+            "name": generate_short_link_name(user_id),
+            "member_limit": 1,
+            "creates_join_request": False
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(invite_link_url, json=invite_link_params) as response:
+                data = await response.json()
+
+            invite_link = data.get('result', {}).get('invite_link')
+            if not invite_link:
+                error_message = f"Помилка створення запрошення: {data}"
+                logger.error(error_message)
+                await session.get(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                    params={"chat_id": ADMIN_ID, "text": error_message}
+                )
+                return
+
+            logger.info(
+                f"Посилання створено для користувача {user_id}: {invite_link}")
+
+            message = (
+                "Дякуємо за оплату! Ваша місячна підписка на канал LookBook активована.\n\n"
+                f"[Перейти до каналу]({invite_link})"
+            )
+            user_message_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            user_msg_params = {
+                "chat_id": user_id,
+                "text": message,
+                "parse_mode": "Markdown"
+            }
+
+            async with session.get(user_message_url, params=user_msg_params) as user_response:
+                if user_response.status == 200:
+                    logger.info(
+                        f"Повідомлення успішно надіслано користувачу {user_id}")
+                    admin_message = f"Користувач @{dbuser[0]} - {dbuser[1]} успішно доданий до каналу."
+                    await session.get(
+                        user_message_url,
+                        params={"chat_id": ADMIN_ID, "text": admin_message}
+                    )
+                    logger.info(
+                        f"Адміністратор повідомлений про додавання користувача {user_id}")
+                else:
+                    error_text = await user_response.text()
+                    logger.error(
+                        f"Помилка надсилання повідомлення користувачу {user_id}: {error_text}")
     else:
         db.update_subs(user_id, payment_sys, order_reference,
                        tg_info["username"], status)
         logger.info(
             f"Підписка оновлена для користувача {user_id} з референсом {order_reference}")
-
-    dbuser = db.get_user(user_id)
-
-    invite_link_url = f"https://api.telegram.org/bot{BOT_TOKEN}/createChatInviteLink"
-    invite_link_params = {
-        "chat_id": CHANNEL_ID,
-        "name": generate_short_link_name(user_id),
-        "member_limit": 1,
-        "creates_join_request": False
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(invite_link_url, json=invite_link_params) as response:
-            data = await response.json()
-
-        invite_link = data.get('result', {}).get('invite_link')
-        if not invite_link:
-            error_message = f"Помилка створення запрошення: {data}"
-            logger.error(error_message)
-            await session.get(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                params={"chat_id": ADMIN_ID, "text": error_message}
-            )
-            return
-
-        logger.info(
-            f"Посилання створено для користувача {user_id}: {invite_link}")
-
-        message = (
-            "Дякуємо за оплату! Ваша місячна підписка на канал LookBook активована.\n\n"
-            f"[Перейти до каналу]({invite_link})"
-        )
-        user_message_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        user_msg_params = {
-            "chat_id": user_id,
-            "text": message,
-            "parse_mode": "Markdown"
-        }
-
-        async with session.get(user_message_url, params=user_msg_params) as user_response:
-            if user_response.status == 200:
-                logger.info(
-                    f"Повідомлення успішно надіслано користувачу {user_id}")
-                admin_message = f"Користувач @{dbuser[0]} - {dbuser[1]} успішно доданий до каналу."
-                await session.get(
-                    user_message_url,
-                    params={"chat_id": ADMIN_ID, "text": admin_message}
-                )
-                logger.info(
-                    f"Адміністратор повідомлений про додавання користувача {user_id}")
-            else:
-                error_text = await user_response.text()
-                logger.error(
-                    f"Помилка надсилання повідомлення користувачу {user_id}: {error_text}")
 
 
 async def delete_user_from_channel(user_id, payment_sys, order_reference, status=None):
